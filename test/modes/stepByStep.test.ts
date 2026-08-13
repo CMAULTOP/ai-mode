@@ -138,3 +138,129 @@ test("step-by-step throws on step failure when stopOnFailure", async () => {
 		stepByStepMode.run({ task: "solve", stopOnFailure: true }, ctx),
 	).rejects.toThrow('Step 1 "step 1" failed')
 })
+
+test("step-by-step routes roles to separate models", async () => {
+	const plannerModel = mockModel({ results: [mockGenerateResult(planJson)] })
+	const executorModel = mockModel({
+		results: [
+			mockGenerateResult("executor result 1"),
+			mockGenerateResult("executor result 2"),
+		],
+	})
+	const synthesizerModel = mockModel({
+		results: [mockGenerateResult("synthesizer answer")],
+	})
+	const ctx: ModeContext = { models: { default: plannerModel } }
+
+	const result = await stepByStepMode.run(
+		{
+			task: "solve",
+			models: { executor: executorModel, synthesizer: synthesizerModel },
+		},
+		ctx,
+	)
+	expect(result.output.steps.map((s) => s.output)).toEqual([
+		"executor result 1",
+		"executor result 2",
+	])
+	expect(result.output.answer).toBe("synthesizer answer")
+})
+
+test("step-by-step resolves role models by id from context", async () => {
+	const plannerModel = mockModel({ results: [mockGenerateResult(planJson)] })
+	const executorModel = mockModel({
+		results: [
+			mockGenerateResult("id executor 1"),
+			mockGenerateResult("id executor 2"),
+		],
+	})
+	const synthesizerModel = mockModel({
+		results: [mockGenerateResult("id answer")],
+	})
+	const ctx: ModeContext = {
+		models: {
+			default: plannerModel,
+			exec: executorModel,
+			synth: synthesizerModel,
+		},
+	}
+	const result = await stepByStepMode.run(
+		{
+			task: "solve",
+			models: { executor: "exec", synthesizer: "synth" },
+		},
+		ctx,
+	)
+	expect(result.output.answer).toBe("id answer")
+	expect(result.output.steps[0]?.output).toBe("id executor 1")
+})
+
+test("step-by-step throws when role model id is missing", async () => {
+	const ctx: ModeContext = { models: { default: mockModel() } }
+	await expect(
+		stepByStepMode.run({ task: "solve", models: { synthesizer: "nope" } }, ctx),
+	).rejects.toThrow('Model "nope" not found')
+})
+
+test("step-by-step isolated mode does not leak previous step results into executor prompt", async () => {
+	const seenPrompts: string[] = []
+	const executorModel = new MockLanguageModelV4({
+		doGenerate: async (opts) => {
+			const text = opts.prompt
+				.filter((m) => m.role === "user")
+				.map((m) =>
+					Array.isArray(m.content)
+						? m.content.map((c) => ("text" in c ? c.text : "")).join("")
+						: m.content,
+				)
+				.join("\n")
+			seenPrompts.push(text)
+			return mockGenerateResult("step output")
+		},
+	})
+	const ctx: ModeContext = {
+		models: {
+			default: mockModel({
+				results: [mockGenerateResult(planJson), mockGenerateResult("answer")],
+			}),
+		},
+	}
+	const result = await stepByStepMode.run(
+		{ task: "solve", models: { executor: executorModel } },
+		ctx,
+	)
+	expect(result.output.answer).toBe("answer")
+	expect(seenPrompts[0] ?? "").not.toContain("Результаты предыдущих шагов")
+	expect(seenPrompts[1] ?? "").not.toContain("Результаты предыдущих шагов")
+})
+
+test("step-by-step non-isolated mode includes previous step results in executor prompt", async () => {
+	const seenPrompts: string[] = []
+	const executorModel = new MockLanguageModelV4({
+		doGenerate: async (opts) => {
+			const text = opts.prompt
+				.filter((m) => m.role === "user")
+				.map((m) =>
+					Array.isArray(m.content)
+						? m.content.map((c) => ("text" in c ? c.text : "")).join("")
+						: m.content,
+				)
+				.join("\n")
+			seenPrompts.push(text)
+			return mockGenerateResult("step output")
+		},
+	})
+	const ctx: ModeContext = {
+		models: {
+			default: mockModel({
+				results: [mockGenerateResult(planJson), mockGenerateResult("answer")],
+			}),
+		},
+	}
+	const result = await stepByStepMode.run(
+		{ task: "solve", isolated: false, models: { executor: executorModel } },
+		ctx,
+	)
+	expect(result.output.answer).toBe("answer")
+	expect(seenPrompts[1] ?? "").toContain("Результаты предыдущих шагов")
+})
