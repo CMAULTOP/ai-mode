@@ -2,8 +2,8 @@ import { createAI, loadModelsFromEnv } from "../src/index.ts"
 
 const ai = createAI({ models: loadModelsFromEnv() })
 
-const id = process.argv[2] ?? "step-by-step"
-const task = process.argv[3] ?? "Explain what a TCP handshake is."
+const id = Bun.argv[2] ?? "step-by-step"
+const task = Bun.argv[3] ?? "Explain what a TCP handshake is."
 
 console.log(`Running mode "${id}" with task: ${task}\n`)
 
@@ -29,7 +29,7 @@ for await (const event of ai.stream(id, { task })) {
 			)
 			break
 		case "text-delta":
-			process.stdout.write(event.delta)
+			Bun.stdout.write(event.delta)
 			break
 		case "result":
 			console.log("\n[result]")
