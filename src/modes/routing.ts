@@ -46,10 +46,10 @@ function formatCatalog(catalog: RoutingCatalogEntry[]): string {
 		.map((entry) => {
 			const parts = [`- ${entry.id}: ${entry.description}`]
 			if (entry.capabilities !== undefined && entry.capabilities.length > 0) {
-				parts.push(`  Возможности: ${entry.capabilities.join(", ")}`)
+				parts.push(`  Capabilities: ${entry.capabilities.join(", ")}`)
 			}
-			if (entry.cost !== undefined) parts.push(`  Стоимость: ${entry.cost}`)
-			if (entry.speed !== undefined) parts.push(`  Скорость: ${entry.speed}`)
+			if (entry.cost !== undefined) parts.push(`  Cost: ${entry.cost}`)
+			if (entry.speed !== undefined) parts.push(`  Speed: ${entry.speed}`)
 			return parts.join("\n")
 		})
 		.join("\n")
@@ -90,17 +90,18 @@ async function pickByLlm(
 		)
 	}
 	const prompt = [
-		`Задача: ${input.task}`,
-		"Каталог моделей:",
+		`Task: ${input.task}`,
+		"Model catalog:",
 		formatCatalog(input.catalog),
-		"Выбери самую подходящую модель из каталога.",
+		"Pick the most suitable model from the catalog.",
 	].join("\n")
 
 	for (let attempt = 0; attempt <= MAX_LLM_RETRIES; attempt++) {
 		const result = await generateText({
 			model,
 			output: Output.object({ schema: choiceSchema }),
-			system: "Ты маршрутизатор запросов к моделям.",
+			system:
+				"You are a request router that maps user tasks to language models.",
 			prompt,
 			abortSignal: ctx.signal,
 		})
@@ -115,7 +116,7 @@ async function pickByLlm(
 			)
 		}
 	}
-	// недостижимо: цикл гарантирует return или throw
+	// unreachable: the loop guarantees return or throw
 	throw new AIModeError("Routing failed", "ROUTING_FAILED")
 }
 
@@ -176,7 +177,7 @@ async function* run(
 
 	const stream = streamText({
 		model: entry.model,
-		system: "Реши задачу. Верни только ответ.",
+		system: "Solve the task. Return only the answer.",
 		prompt: input.task,
 		abortSignal: ctx.signal,
 	})
@@ -208,11 +209,11 @@ async function* run(
 
 export const routingMode: Mode<RoutingInput, RoutingOutput> = fromStream(
 	"routing",
-	"Выбирает лучшую модель для задачи и выполняет её",
+	"Picks the best model for a task and executes it",
 	routing,
 )
 
-// сброс счётчика для тестов
+// resets the counter for tests
 export function resetRoutingRoundRobin(): void {
 	roundRobinIndex = 0
 }

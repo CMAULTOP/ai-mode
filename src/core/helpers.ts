@@ -45,7 +45,7 @@ export function emitLogger(
 	try {
 		logger(evt)
 	} catch {
-		// logger не должен ронять выполнение режима
+		// logger must not crash mode execution
 	}
 }
 
@@ -107,7 +107,7 @@ export function fromRun<Input, Output>(
 
 			yield { type: "start", mode: id, input }
 			try {
-				// поток emit-событий: yield сразу, как только событие появилось
+				// emit-event stream: yield as soon as an event appears
 				while (!settled || buffer.length > 0) {
 					if (buffer.length > 0) {
 						const evt = buffer.shift()

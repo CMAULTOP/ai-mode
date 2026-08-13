@@ -18,9 +18,9 @@ export interface StepByStepInput {
 	maxSteps?: number
 	stopOnFailure?: boolean
 	promptPerStep?: string
-	/** Изолировать контекст шагов (по умолчанию true). */
+	/** Isolate step context (default true). */
 	isolated?: boolean
-	/** Модели по ролям: planner, executor, synthesizer. По умолчанию — ctx.models.default. */
+	/** Models per role: planner, executor, synthesizer. Defaults to ctx.models.default. */
 	models?: {
 		planner?: RoleModel
 		executor?: RoleModel
@@ -119,11 +119,11 @@ async function* run(
 		input,
 	}
 
-	// Фаза 1: план (planner)
+	// Phase 1: plan (planner)
 	const planResult = await generateText({
 		model: planner,
 		output: Output.object({ schema: planSchema }),
-		system: `Разбей задачу на шаги. Верни максимум ${maxSteps} шагов.`,
+		system: `Break the task down into steps. Return at most ${maxSteps} steps.`,
 		prompt: input.task,
 		abortSignal: ctx.signal,
 	})
@@ -150,22 +150,22 @@ async function* run(
 		}
 
 		const promptParts = [
-			input.promptPerStep ?? "Выполни следующий шаг задачи.",
-			`Шаг ${i + 1}/${plan.length}: ${step.title}`,
-			step.description.length > 0 ? `Описание: ${step.description}` : "",
+			input.promptPerStep ?? "Execute the next step of the task.",
+			`Step ${i + 1}/${plan.length}: ${step.title}`,
+			step.description.length > 0 ? `Description: ${step.description}` : "",
 		]
-		// Каскад ролей: при изоляции executor не видит результаты предыдущих шагов.
+		// Role cascade: when isolated, the executor does not see previous step results.
 		if (!isolated && results.length > 0) {
-			promptParts.push(`Результаты предыдущих шагов:\n${results.join("\n")}`)
+			promptParts.push(`Results of previous steps:\n${results.join("\n")}`)
 		}
-		promptParts.push(`Исходная задача: ${input.task}`)
+		promptParts.push(`Original task: ${input.task}`)
 		const prompt = promptParts.filter(Boolean).join("\n")
 
 		try {
 			const stepResult = await generateText({
 				model: executor,
 				system:
-					"Ты решаешь задачу по шагам. Верни только результат текущего шага.",
+					"You solve tasks step by step. Return only the result of the current step.",
 				prompt,
 				abortSignal: ctx.signal,
 			})
@@ -224,13 +224,13 @@ async function* run(
 		}
 	}
 
-	// Фаза 3: синтез (synthesizer) — собирает результаты всех шагов
+	// Phase 3: synthesis (synthesizer) — collects the results of all steps
 	const synthesizeResult = await generateText({
 		model: synthesizer,
-		system: "Собери финальный ответ на основе результатов шагов.",
+		system: "Compose the final answer based on the results of the steps.",
 		prompt: [
-			`Исходная задача: ${input.task}`,
-			`Результаты шагов:\n${results.join("\n")}`,
+			`Original task: ${input.task}`,
+			`Step results:\n${results.join("\n")}`,
 		].join("\n"),
 		abortSignal: ctx.signal,
 	})
@@ -248,6 +248,6 @@ async function* run(
 export const stepByStepMode: Mode<StepByStepInput, StepByStepOutput> =
 	fromStream(
 		"step-by-step",
-		"Планирует задачу, изолированно выполняет шаги разными ролями и собирает ответ",
+		"Plans the task, executes steps in isolation via separate roles, and assembles the answer",
 		stepByStep,
 	)

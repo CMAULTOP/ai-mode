@@ -118,7 +118,7 @@ test("step-by-step throws on step failure when stopOnFailure", async () => {
 						: m.content,
 				)
 				.join("\n")
-			if (text.includes("Шаг 1/2")) {
+			if (text.includes("Step 1/2")) {
 				throw new Error("boom")
 			}
 			return mockGenerateResult(planJson)
@@ -133,7 +133,7 @@ test("step-by-step throws on step failure when stopOnFailure", async () => {
 	expect(types).toContain("error")
 	expect(types).not.toContain("result")
 
-	// run() должен бросить StepExecutionError
+	// run() should throw a StepExecutionError
 	await expect(
 		stepByStepMode.run({ task: "solve", stopOnFailure: true }, ctx),
 	).rejects.toThrow('Step 1 "step 1" failed')
@@ -230,8 +230,8 @@ test("step-by-step isolated mode does not leak previous step results into execut
 		ctx,
 	)
 	expect(result.output.answer).toBe("answer")
-	expect(seenPrompts[0] ?? "").not.toContain("Результаты предыдущих шагов")
-	expect(seenPrompts[1] ?? "").not.toContain("Результаты предыдущих шагов")
+	expect(seenPrompts[0] ?? "").not.toContain("Results of previous steps")
+	expect(seenPrompts[1] ?? "").not.toContain("Results of previous steps")
 })
 
 test("step-by-step non-isolated mode includes previous step results in executor prompt", async () => {
@@ -262,5 +262,5 @@ test("step-by-step non-isolated mode includes previous step results in executor 
 		ctx,
 	)
 	expect(result.output.answer).toBe("answer")
-	expect(seenPrompts[1] ?? "").toContain("Результаты предыдущих шагов")
+	expect(seenPrompts[1] ?? "").toContain("Results of previous steps")
 })
