@@ -9,6 +9,7 @@
 		"build": "bun build ./src/index.ts --outdir dist --target=bun"
 	},
 	"dependencies": {
+		"@ai-sdk/openai-compatible": "^3.0.30",
 		"ai": "^7.0.64",
 		"zod": "^4.4.3"
 	},

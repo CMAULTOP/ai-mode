@@ -11,6 +11,7 @@ import type {
 } from "./core/types.ts"
 import { registerAllModes } from "./modes/index.ts"
 
+export { loadModelsFromEnv } from "./config/env.ts"
 export { createModeContext } from "./core/context.ts"
 export type {
 	AbortModeError,

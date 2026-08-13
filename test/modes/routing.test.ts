@@ -3,7 +3,11 @@ import type { LanguageModel } from "ai"
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test"
 import type { ModeContext, ModeEvent } from "../../src/core/types.ts"
 import { resetRoutingRoundRobin, routingMode } from "../../src/modes/routing.ts"
-import { mockGenerateResult, mockModel } from "../helpers/mockModel.ts"
+import {
+	mockGenerateResult,
+	mockModel,
+	spyModel,
+} from "../helpers/mockModel.ts"
 
 const planJson = JSON.stringify({ choice: "b", reason: "fastest" })
 
@@ -117,6 +121,44 @@ test("routing llm picks model from catalog via default model", async () => {
 	expect(result.output.choice).toBe("b")
 	expect(result.output.reason).toBe("fastest")
 	expect(result.output.answer).toBe("answer B")
+})
+
+test("routing llm sends catalog and routing system prompt to the default model", async () => {
+	const defaultModel = spyModel([mockGenerateResult(planJson)])
+	const ctx = ctxWithDefault(defaultModel.model)
+	const result = await routingMode.run(
+		{ task: "t", catalog, strategy: "llm" },
+		ctx,
+	)
+	expect(result.output.choice).toBe("b")
+
+	// 1 вызов выбора: в промте — задача и описания всех моделей каталога
+	expect(defaultModel.calls).toHaveLength(1)
+	const call = defaultModel.calls[0]
+	expect(call).toBeDefined()
+	if (call === undefined) return
+	expect(call.system).toBe(
+		"You are a request router that maps user tasks to language models.",
+	)
+	expect(call.user).toContain("Task: t")
+	expect(call.user).toContain("- a: cheap")
+	expect(call.user).toContain("- b: fast")
+	expect(call.user).toContain("- c: expensive")
+	expect(call.user).toContain("Cost: 1")
+	expect(call.user).toContain("Speed: 10")
+})
+
+test("routing priority does not call any model for selection", async () => {
+	const defaultModel = spyModel([])
+	const ctx = ctxWithDefault(defaultModel.model)
+	// priority: выбор детерминированный, но исполнение через выбранную модель из каталога
+	// (мок в каталоге использует doStream, поэтому default не вызывается)
+	const result = await routingMode.run(
+		{ task: "t", catalog, strategy: "priority" },
+		ctx,
+	)
+	expect(result.output.choice).toBe("a")
+	expect(defaultModel.calls).toHaveLength(0)
 })
 
 test("routing llm retries once on unknown choice then throws", async () => {

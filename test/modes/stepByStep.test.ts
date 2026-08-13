@@ -2,7 +2,11 @@ import { expect, test } from "bun:test"
 import { MockLanguageModelV4 } from "ai/test"
 import type { ModeContext, ModeEvent } from "../../src/core/types.ts"
 import { stepByStepMode } from "../../src/modes/stepByStep.ts"
-import { mockGenerateResult, mockModel } from "../helpers/mockModel.ts"
+import {
+	mockGenerateResult,
+	mockModel,
+	spyModel,
+} from "../helpers/mockModel.ts"
 
 const planJson = JSON.stringify({
 	steps: [
@@ -263,4 +267,61 @@ test("step-by-step non-isolated mode includes previous step results in executor 
 	)
 	expect(result.output.answer).toBe("answer")
 	expect(seenPrompts[1] ?? "").toContain("Results of previous steps")
+})
+
+test("step-by-step sends correct system prompts and task text per phase", async () => {
+	const planner = spyModel([
+		mockGenerateResult(planJson),
+		mockGenerateResult("step 1 output"),
+		mockGenerateResult("step 2 output"),
+		mockGenerateResult("final answer"),
+	])
+	const ctx: ModeContext = { models: { default: planner.model } }
+	const result = await stepByStepMode.run({ task: "solve", maxSteps: 3 }, ctx)
+
+	expect(result.output.answer).toBe("final answer")
+	expect(planner.calls).toHaveLength(4)
+
+	// 1. plan phase
+	expect(planner.calls[0]?.system).toBe(
+		"Break the task down into steps. Return at most 3 steps.",
+	)
+	expect(planner.calls[0]?.user).toContain("solve")
+
+	// 2-3. executor phases: task + step title/description
+	expect(planner.calls[1]?.system).toContain("step by step")
+	expect(planner.calls[1]?.user).toContain("Step 1/2: step 1")
+	expect(planner.calls[1]?.user).toContain("Description: first")
+	expect(planner.calls[2]?.user).toContain("Step 2/2: step 2")
+
+	// 4. synthesizer phase: task + step results
+	expect(planner.calls[3]?.system).toContain("final answer")
+	expect(planner.calls[3]?.user).toContain("Original task: solve")
+	expect(planner.calls[3]?.user).toContain("Step results:")
+	expect(planner.calls[3]?.user).toContain("step 1 output")
+	expect(planner.calls[3]?.user).toContain("step 2 output")
+})
+
+test("step-by-step executor prompt contains task, step number and description", async () => {
+	const executor = spyModel([
+		mockGenerateResult("out 1"),
+		mockGenerateResult("out 2"),
+	])
+	const ctx: ModeContext = {
+		models: {
+			default: mockModel({
+				results: [mockGenerateResult(planJson), mockGenerateResult("answer")],
+			}),
+		},
+	}
+	await stepByStepMode.run(
+		{ task: "analyze X", models: { executor: executor.model } },
+		ctx,
+	)
+
+	expect(executor.calls).toHaveLength(2)
+	const first = executor.calls[0]?.user ?? ""
+	expect(first).toContain("Original task: analyze X")
+	expect(first).toContain("Step 1/2: step 1")
+	expect(first).toContain("Description: first")
 })
