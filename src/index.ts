@@ -1,5 +1,5 @@
 export interface CreateAIConfig {
-	models: Record<string, unknown>;
+	models: Record<string, unknown>
 }
 
 export function createAI(_config: CreateAIConfig): void {
