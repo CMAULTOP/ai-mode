@@ -171,8 +171,14 @@ export function fromStream<Input, Output>(
 				mode: id,
 			}
 		},
-		stream(input, ctx) {
-			return stream(input, ctx)
+		async *stream(input, ctx) {
+			try {
+				for await (const evt of stream(input, ctx)) {
+					yield evt
+				}
+			} catch (error) {
+				yield { type: "error", error: asError(error) }
+			}
 		},
 	}
 }
