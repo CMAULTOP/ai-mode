@@ -1,0 +1,20 @@
+{
+	"name": "ai-mode",
+	"type": "module",
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"lint": "biome check",
+		"format": "biome format --write",
+		"build": "bun build ./src/index.ts --outdir dist --target=bun"
+	},
+	"dependencies": {
+		"ai": "^7.0.64",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.8",
+		"@types/bun": "latest",
+		"typescript": "^5"
+	}
+}
