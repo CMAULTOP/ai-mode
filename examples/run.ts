@@ -2,8 +2,8 @@ import { createAI, loadModelsFromEnv } from "../src/index.ts"
 
 const ai = createAI({ models: loadModelsFromEnv() })
 
-const id = Bun.argv[2] ?? "step-by-step"
-const task = Bun.argv[3] ?? "Explain what a TCP handshake is."
+const id = Bun.env.AI_MODE_ID ?? "step-by-step"
+const task = Bun.env.AI_MODE_TASK ?? "Explain what a TCP handshake is."
 
 console.log(`Running mode "${id}" with task: ${task}\n`)
 
