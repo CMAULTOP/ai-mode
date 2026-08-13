@@ -49,7 +49,7 @@ src/
     deepResearch.ts
     routing.ts
     ensemble.ts
-    index.ts        # registerAllModes(registry) — автообнаружение через import.meta.glob (не редактируется при добавлении режима)
+    index.ts        # registerAllModes(registry) — явный список MODES (import.meta.glob не работает в рантайме Bun)
   index.ts          # createAI(config), export типов
 examples/
   basic.ts          # все 4 режима, без API-ключей не работает — пример кода
@@ -228,18 +228,15 @@ bun test
   ```
   `AI` = `{ run(id, input), stream(id, input): AsyncIterable<ModeEvent>, list(): ModeDescriptor[], mode(id): ModeHandle }`, где `ModeHandle` = `{ run(input), stream(input) }`.
 - Внутри: `ModeRegistry` + `registerAllModes` (из `modes/index.ts`) + регистрация пользовательских `modes`.
-- **Автообнаружение режимов** (снимает конфликты параллельных PR 5/6/7): `modes/index.ts` не хранит список вручную, а использует Bun-глоб:
+- **Регистрация режимов** (снимает конфликты параллельных PR 5/6/7): `modes/index.ts` хранит явный массив `MODES: Mode[]`, в который добавляется каждый новый режим:
   ```ts
-  const modeModules = import.meta.glob('./**/*.ts', { eager: true })
+  import { stepByStep } from "./stepByStep.ts"
+  const MODES: Mode[] = [stepByStep]
   export function registerAllModes(registry: ModeRegistry) {
-    for (const mod of Object.values(modeModules)) {
-      const exported = mod as Record<string, unknown>
-      for (const value of Object.values(exported))
-        if (isMode(value)) registry.register(value)
-    }
+    for (const mode of MODES) registry.register(mode)
   }
   ```
-  Новый режим кладётся в `src/modes/foo.ts`, экспортирует `Mode`, и `index.ts` вообще не редактируется → параллельные PR не конфликтуют. Утилита `isMode` (type guard) — в core.
+  > `import.meta.glob` НЕ используется: в рантайме Bun (не в бандлере) он не реализован (oven-sh/bun#6060). Явный список проще и надёжнее; конфликты параллельных PR решаются тривиально — одна строка на режим.
 - Убедиться: `run` передаёт `input` в режим и возвращает `ModeResult`; `stream` проксирует события; `signal`/`tokenBudget` пробрасываются в `ModeContext`.
 - Тест: `createAI` с фейковым режимом (без реальной модели) — run/stream/list работают; `run('unknown')` → `ModeNotFoundError`; автообнаружение подхватывает файл режима без правки index.
 
@@ -405,7 +402,7 @@ bun pack --dry-run
 ## Сводка
 
 - Шагов: **8** (1 scaffold → 2 core → 3 API → 4 паттерн → 5,6,7 параллель → 8 docs/publish).
-- Параллельность: шаги 5, 6, 7 можно делать параллельно после шага 4 — автообнаружение режимов исключает конфликты в общем файле.
+- Параллельность: шаги 5, 6, 7 можно делать параллельно после шага 4 — явный список режимов в `modes/index.ts` (одна строка на режим).
 - Проверка после каждого шага: `bun run typecheck` + `bun test` (+ `build`/`build:types` в CI с шага 1).
 - Инвариант: ядро без `any`, режимы без прямых импортов провайдеров, все вызовы AI SDK получают `abortSignal: ctx.signal`.
 

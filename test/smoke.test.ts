@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test"
 import { createAI } from "../src/index.ts"
+import { mockModel } from "./helpers/mockModel.ts"
 
-test("createAI returns void stub", () => {
-	expect(createAI({ models: { default: {} } })).toBeUndefined()
+test("createAI builds an AI instance", () => {
+	const ai = createAI({ models: { default: mockModel() } })
+	expect(ai.list()).toEqual([])
 })
