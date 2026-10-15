@@ -1,6 +1,15 @@
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { createAI, loadModelsFromEnv } from "../src/index.ts"
 
-const ai = createAI({ models: loadModelsFromEnv() })
+const provider = createOpenAICompatible({
+	name: "ai-mode",
+	baseURL: Bun.env.AI_MODE_BASE_URL ?? "https://api.openai.com/v1",
+	apiKey: Bun.env.AI_MODE_API_KEY ?? "",
+})
+
+const ai = createAI({
+	models: loadModelsFromEnv((modelId) => provider(modelId)),
+})
 
 const id = Bun.env.AI_MODE_ID ?? "step-by-step"
 const task = Bun.env.AI_MODE_TASK ?? "Explain what a TCP handshake is."
